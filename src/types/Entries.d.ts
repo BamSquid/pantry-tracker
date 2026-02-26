@@ -8,5 +8,6 @@ export interface EntryValues {
 }
 
 export interface EntriesDocument {
+    id: string;
     entries: EntryValues[];
 }

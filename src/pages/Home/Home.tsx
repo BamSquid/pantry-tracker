@@ -1,24 +1,47 @@
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "@context/AuthContext/useAuth";
-import { Button, LoadingOverlay } from "@mantine/core";
+import { Button, Group, LoadingOverlay, Stack, Text } from "@mantine/core";
 import { useFirestore } from "@context/FirestoreContext/useFirestore";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import type { EntriesDocument, EntryValues } from "@types";
+import PantryTable from "@components/PantryTable/PantryTable";
+import { modals } from "@mantine/modals";
+import AddNewPantryForm from "@components/AddNewPantryForm/AddNewPantryForm";
+import { IconTablePlus } from '@tabler/icons-react';
 
-const Home = () => {
-    const {currentUser, logOut} = useAuth();
+const Home = (): ReactElement => {
+    const { currentUser } = useAuth();
     const [isLoading, setIsLoading] = useState(false);
-    const [data, setData] = useState<EntryValues[] | null>(null);
-    const {getDocument} = useFirestore();
-    const navigate = useNavigate();
+    const [data, setData] = useState<EntriesDocument[] | undefined>(undefined);
+    const [pantries, setPantries] = useState<ReactElement[]>([]);
+    const { getCollection, getDocument } = useFirestore();
 
     useEffect(() => {
-        const getPantries = async () => {
+        getPantries();
+    }, [currentUser]);
+
+    useEffect(() => {
+        if (data && data.length > 0) {
+            const pantryData: ReactElement[] = [];
+            data.forEach(async (pantry) => {
+                const entries = await getCollection<EntryValues>(`users/${currentUser?.email}/pantries/${pantry.id}/entries`);
+                const formattedData = entries.map((entry) => ({
+                    ...entry,
+                    dateAdded: entry.dateAdded.toDate().toLocaleDateString(),
+                    expirationDate: entry.expirationDate.toDate().toLocaleDateString()
+                }));
+                pantryData.push(<PantryTable header={pantry.id} entries={formattedData} onUpdate={getPantries} key={pantry.id}/>);
+            });
+            setPantries(pantryData);
+        }
+    }, [data]);
+
+    const getPantries = async () => {
+        if (currentUser && currentUser.email) {
             setIsLoading(true);
             try {
-                const collection = `users/${currentUser?.email}/pantries`;
-                const data = await getDocument<EntriesDocument>(collection, 'basement');
-                setData(data?.entries ?? []);
+                const collection = `users/${currentUser.email}/pantries`;
+                const data = await getCollection<EntriesDocument>(collection);
+                setData(data ?? []);
             }
             catch (error) {
                 console.error('Error fetching data', error);
@@ -26,38 +49,49 @@ const Home = () => {
             finally {
                 setIsLoading(false);
             }
-        };
-
-        getPantries();
-    }, [currentUser, getDocument]);
-
-    const navigateToPage = (page: string) => {
-        navigate(`/${page}`);
+        }
     };
+
+    const openModal = () => modals.open({
+        title: 'Add new pantry',
+        children: <AddNewPantryForm />,
+        centered: true,
+        size: 'md',
+        onClose: getPantries
+    });
 
     return (
         <div>
             {currentUser ? (
                 <div>
                     <h1>Welcome, {currentUser.displayName || currentUser.email}</h1>
-                    {data !== null && data.length === 0 ? 
-                        <Button>Create something new</Button> :
-                        <div>
-                            {data?.map((entry, index) => (
-                                <li key={index}>
-                                    {`${entry.name} added on ${entry.dateAdded.toDate().toLocaleDateString()}, ${entry.quantity} to expire on ${entry.expirationDate.toDate().toLocaleDateString()}`}
-                                </li>
-                            ))}
-                        </div>
+                    {pantries.length === 0 ?
+                        <>
+                            <Text>
+                                It looks like you don't have any pantries set up yet. Please click the button to start.
+                            </Text>
+                            <Button variant='outline' onClick={openModal}>
+                                <Group gap='xs'>
+                                    <IconTablePlus size={16} color='white' />
+                                    <Text>Add new collection</Text>
+                                </Group>
+                            </Button>
+                        </> :
+                        <Stack>
+                            {pantries}
+                            <Button variant='filled' onClick={openModal}>
+                                <Group gap='xs'>
+                                    <IconTablePlus size={16} color='white' />
+                                    <Text>Add new collection</Text>
+                                </Group>
+                            </Button>
+                        </Stack>
                     }
-                    <Button onClick={logOut}>Log out</Button>
                     <LoadingOverlay visible={isLoading} zIndex={1000} overlayProps={{ radius: "sm", blur: 2 }} />
                 </div>
-            ): (
+            ) : (
                 <div>
-                    <p>Please log in to see your profile, or create an account</p>
-                    <Button onClick={() => navigateToPage('login')}>Log in</Button>
-                    <Button onClick={() => navigateToPage('signup')}>Sign up</Button>
+                    <p>Please create an account, or log in to view your profile</p>
                 </div>
             )}
         </div>

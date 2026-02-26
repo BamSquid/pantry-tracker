@@ -1,0 +1,9 @@
+.appHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.loginSignupButtons {
+  margin-right: 1rem;
+}

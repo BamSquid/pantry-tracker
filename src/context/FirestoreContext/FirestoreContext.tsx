@@ -1,5 +1,5 @@
-import React, { createContext, useContext, type FC } from 'react';
-import {  collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, CollectionReference, type DocumentData } from 'firebase/firestore';
+import React, { createContext, type FC } from 'react';
+import { collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, CollectionReference, type DocumentData, setDoc, collectionGroup, onSnapshot, query, QueryConstraint, Unsubscribe } from 'firebase/firestore';
 import { db } from '@src/firebaseConfig';
 import type { FirestoreContextType } from '@types';
 
@@ -28,6 +28,11 @@ export const FirestoreProvider: FC<{ children: React.ReactNode }> = ({ children 
     return docRef.id;
   };
 
+  const addDocumentWithId = async <T extends DocumentData>(collectionPath: string, id: string, data: T): Promise<void> => {
+    const docRef = doc(db, collectionPath, id);
+    await setDoc(docRef, data);
+  };
+
   const updateDocument = async <T,>(collectionPath: string, id: string, data: Partial<T>): Promise<void> => {
     const docRef = doc(db, collectionPath, id);
     await updateDoc(docRef, data);
@@ -38,8 +43,42 @@ export const FirestoreProvider: FC<{ children: React.ReactNode }> = ({ children 
     await deleteDoc(docRef);
   };
 
+  const getQuery = async <T,>(
+    collectionPath: string,
+    constraints: QueryConstraint[],
+    useCollectionGroup: boolean = false
+  ): Promise<T[]> => {
+    const baseRef = useCollectionGroup
+      ? collectionGroup(db, collectionPath)
+      : collection(db, collectionPath);
+
+    const q = query(baseRef, ...constraints);
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
+  };
+
+  const listenQuery = <T,>(
+    collectionPath: string,
+    constraints: QueryConstraint[],
+    callback: (data: T[]) => void,
+    useCollectionGroup: boolean = false
+  ): Unsubscribe => {
+    const baseRef = useCollectionGroup
+      ? collectionGroup(db, collectionPath)
+      : collection(db, collectionPath);
+
+    const q = query(baseRef, ...constraints);
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
+      callback(results);
+    });
+
+    return unsubscribe; // you can use this to stop listening
+  };
+
   return (
-    <FirestoreContext.Provider value={{ getDocument, getCollection, addDocument, updateDocument, deleteDocument }}>
+    <FirestoreContext.Provider value={{ getDocument, getCollection, addDocument, addDocumentWithId, updateDocument, deleteDocument, getQuery, listenQuery }}>
       {children}
     </FirestoreContext.Provider>
   );

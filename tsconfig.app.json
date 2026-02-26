@@ -29,6 +29,7 @@
       "@context/*": ["src/context/*"],
       "@pages/*": ["src/pages/*"],
       "@src/*": ["src/*"],
+      "@styles/*": ["src/styles/*"],
       "@types": ["src/types/index.ts"]
     }
   },

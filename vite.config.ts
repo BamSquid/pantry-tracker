@@ -11,6 +11,8 @@ export default defineConfig({
       '@context': path.resolve(__dirname, 'src/context'),
       '@pages': path.resolve(__dirname, 'src/pages'),
       '@src': path.resolve(__dirname, 'src'),
+      '@styles': path.resolve(__dirname, 'src/styles'),
+      '@tabler/icons-react': '@tabler/icons-react/dist/esm/icons/index.mjs',
       '@types': path.resolve(__dirname, 'src/types')
     }
   },
